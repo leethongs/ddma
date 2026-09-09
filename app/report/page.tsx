@@ -19,7 +19,7 @@ export default function ReportPage() {
   const [submitting, setSubmitting] = useState(false);
   const [claimId, setClaimId] = useState("");
   const [error, setError] = useState("");
-  const fileRef = useRef<HTMLInputElement>(null);
+  const cameraRef = useRef<HTMLInputElement>(null);`n  const galleryRef = useRef<HTMLInputElement>(null);
 
   const [form, setForm] = useState({
     victim_name: "", contact_number: "", aadhaar_number: "", address: "",
