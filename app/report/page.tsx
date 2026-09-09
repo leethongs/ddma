@@ -7,11 +7,11 @@ import Link from "next/link";
 
 const damageTypes = ["Flood", "Cyclone", "Earthquake", "Fire", "Landslide", "Other"];
 
+type PhotoItem = { file: File, blob: Blob | null, preview: string };
+
 export default function ReportPage() {
   const [step, setStep] = useState<number | "done">(1);
-  const [photo, setPhoto] = useState<File | null>(null);
-  const [photoPreview, setPhotoPreview] = useState<string>("");
-  const [geotaggedBlob, setGeotaggedBlob] = useState<Blob | null>(null);
+  const [photos, setPhotos] = useState<PhotoItem[]>([]);
   const [gpsLoading, setGpsLoading] = useState(false);
   const [gpsError, setGpsError] = useState("");
   const [coords, setCoords] = useState<{ lat: number, lng: number } | null>(null);
@@ -29,7 +29,6 @@ export default function ReportPage() {
     damage_type: "Flood", damage_details: "",
   });
 
-  // Start the HTML5 In-App Camera
   async function startCamera() {
     setShowWebcam(true);
     try {
@@ -47,7 +46,6 @@ export default function ReportPage() {
     }
   }
 
-  // Stop the HTML5 Camera
   function stopCamera() {
     if (videoRef.current && videoRef.current.srcObject) {
       const stream = videoRef.current.srcObject as MediaStream;
@@ -56,7 +54,6 @@ export default function ReportPage() {
     setShowWebcam(false);
   }
 
-  // Take a snap from the video feed
   function takeSnap() {
     if (!videoRef.current) return;
     const canvas = document.createElement("canvas");
@@ -68,17 +65,15 @@ export default function ReportPage() {
     
     canvas.toBlob(blob => {
       if (blob) {
-        const file = new File([blob], "snap.jpg", { type: "image/jpeg" });
+        const file = new File([blob], "snap-" + Date.now() + ".jpg", { type: "image/jpeg" });
         stopCamera();
         processFile(file);
       }
     }, "image/jpeg", 0.9);
   }
 
-  // Common file processor for both Camera Snap and Gallery
   function processFile(file: File) {
     if (!file) return;
-    setPhoto(file);
     setGpsLoading(true);
     setGpsError("");
     navigator.geolocation.getCurrentPosition(
@@ -88,35 +83,40 @@ export default function ReportPage() {
         setCoords({ lat, lng });
         try {
           const blob = await burnGeotag(file, lat, lng);
-          setGeotaggedBlob(blob);
-          setPhotoPreview(URL.createObjectURL(blob));
+          setPhotos(p => [...p, { file, blob, preview: URL.createObjectURL(blob) }]);
         } catch {
-          setPhotoPreview(URL.createObjectURL(file));
+          setPhotos(p => [...p, { file, blob: null, preview: URL.createObjectURL(file) }]);
         }
         setGpsLoading(false);
       },
       (err) => {
         setGpsError("Warning: GPS Location blocked or turned off in phone menu. You can still proceed without coordinates.");
         setGpsLoading(false);
-        setPhotoPreview(URL.createObjectURL(file));
+        setPhotos(p => [...p, { file, blob: null, preview: URL.createObjectURL(file) }]);
       },
       { enableHighAccuracy: true, timeout: 15000 }
     );
+  }
+
+  function removePhoto(index: number) {
+    setPhotos(p => p.filter((_, i) => i !== index));
   }
 
   async function handleSubmit() {
     setSubmitting(true);
     setError("");
     try {
-      const uploadBlob = geotaggedBlob ?? photo;
-      let photoUrl = "";
-      if (uploadBlob) {
-        const fname = "incident-" + Date.now() + ".jpg";
+      const uploadedUrls: string[] = [];
+      
+      for (const p of photos) {
+        const uploadBlob = p.blob ?? p.file;
+        const fname = "incident-" + Date.now() + "-" + Math.random().toString(36).substring(7) + ".jpg";
         const { error: uploadErr } = await supabaseAdmin.storage.from("incident-photos").upload(fname, uploadBlob, { contentType: "image/jpeg" });
         if (uploadErr) throw uploadErr;
         const { data: urlData } = supabaseAdmin.storage.from("incident-photos").getPublicUrl(fname);
-        photoUrl = urlData.publicUrl;
+        uploadedUrls.push(urlData.publicUrl);
       }
+
       const { data, error: dbErr } = await supabaseAdmin.from("incidents").insert([{
         victim_name: form.victim_name,
         contact_number: form.contact_number,
@@ -124,11 +124,12 @@ export default function ReportPage() {
         address: form.address,
         damage_type: form.damage_type,
         damage_details: form.damage_details,
-        photo_url: photoUrl || null,
+        photo_url: uploadedUrls.join(",") || null,
         latitude: coords?.lat ?? null,
         longitude: coords?.lng ?? null,
         status: "pending",
       }]).select("id").single();
+      
       if (dbErr) throw dbErr;
       setClaimId(data.id.slice(0, 8).toUpperCase());
       setStep("done");
@@ -138,7 +139,7 @@ export default function ReportPage() {
     setSubmitting(false);
   }
 
-  const canProceedStep1 = !!photo && !gpsLoading;
+  const canProceedStep1 = photos.length > 0 && !gpsLoading;
   const canProceedStep2 = form.victim_name.trim() && form.contact_number.trim().length === 10 && form.address.trim();
 
   return (
@@ -184,63 +185,65 @@ export default function ReportPage() {
         {step === 1 && (
           <div className="space-y-5">
             <div>
-              <h2 className="text-xl font-bold text-slate-800 mb-1">Take a Photo</h2>
-              <p className="text-slate-500 text-sm">Photo will be automatically geotagged with your GPS coordinates.</p>
+              <h2 className="text-xl font-bold text-slate-800 mb-1">Take Photos</h2>
+              <p className="text-slate-500 text-sm">Upload multiple photos. They will be automatically geotagged.</p>
             </div>
 
-            <input ref={galleryRef} type="file" accept="image/*" className="hidden" onChange={(e) => {
-              if (e.target.files?.[0]) processFile(e.target.files[0]);
+            <input ref={galleryRef} type="file" accept="image/*" multiple className="hidden" onChange={(e) => {
+              if (e.target.files) {
+                Array.from(e.target.files).forEach(file => processFile(file));
+              }
             }} />
 
-            {!photo ? (
-              <div className="grid grid-cols-2 gap-3">
-                <button onClick={startCamera} className="border-2 border-dashed border-blue-300 rounded-2xl py-10 flex flex-col items-center gap-3 bg-blue-50 hover:bg-blue-100 active:bg-blue-200 transition-colors">
-                  <Camera size={36} className="text-blue-500" />
-                  <div>
-                    <p className="text-blue-700 font-bold text-sm">Open Camera</p>
-                    <p className="text-blue-400 text-[10px] mt-1 px-2">Now built-in! No crashes.</p>
+            {photos.length > 0 && (
+              <div className="grid grid-cols-2 gap-3 mb-4">
+                {photos.map((p, i) => (
+                  <div key={i} className="relative rounded-xl overflow-hidden shadow-md h-40">
+                    <img src={p.preview} alt={`Damage ${i+1}`} className="w-full h-full object-cover" />
+                    <button onClick={() => removePhoto(i)} className="absolute top-2 right-2 bg-black/60 p-1.5 rounded-full text-white hover:bg-red-600 transition-colors shadow-sm">
+                      <X size={16} />
+                    </button>
                   </div>
-                </button>
-                <button onClick={() => galleryRef.current?.click()} className="border-2 border-dashed border-slate-300 rounded-2xl py-10 flex flex-col items-center gap-3 bg-slate-50 hover:bg-slate-100 active:bg-slate-200 transition-colors">
-                  <svg xmlns="http://www.w3.org/2000/svg" width="36" height="36" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-slate-500"><rect width="18" height="18" x="3" y="3" rx="2" ry="2"/><circle cx="9" cy="9" r="2"/><path d="m21 15-3.086-3.086a2 2 0 0 0-2.828 0L6 21"/></svg>
-                  <div>
-                    <p className="text-slate-700 font-bold text-sm">Upload from Gallery</p>
-                    <p className="text-slate-400 text-[10px] mt-1 px-2">Choose existing photo</p>
-                  </div>
-                </button>
-              </div>
-            ) : (
-              <div className="space-y-3">
-                <div className="relative rounded-2xl overflow-hidden shadow-md">
-                  {gpsLoading ? (
-                    <div className="absolute inset-0 bg-black/60 flex flex-col items-center justify-center z-10">
-                      <Loader size={32} className="text-white animate-spin mb-2" />
-                      <p className="text-white text-sm font-medium">Getting GPS location...</p>
-                      <p className="text-slate-300 text-xs mt-1">Burning geotag into photo</p>
-                    </div>
-                  ) : null}
-                  <img src={photoPreview} alt="Captured" className="w-full object-cover max-h-72" />
-                </div>
-
-                {gpsError && (
-                  <div className="flex items-start gap-2 bg-yellow-50 border border-yellow-200 rounded-xl p-3">
-                    <AlertCircle size={16} className="text-yellow-600 flex-shrink-0 mt-0.5" />
-                    <p className="text-yellow-800 text-sm font-medium">{gpsError}</p>
-                  </div>
-                )}
-
-                {coords && !gpsLoading && (
-                  <div className="flex items-center gap-2 bg-green-50 border border-green-200 rounded-xl p-3">
-                    <MapPin size={16} className="text-green-600" />
-                    <p className="text-green-700 text-sm font-medium">{coords.lat.toFixed(5)}&deg;N, {coords.lng.toFixed(5)}&deg;E &mdash; Geotagged</p>
-                  </div>
-                )}
-
-                <button onClick={() => { setPhoto(null); setPhotoPreview(""); setGeotaggedBlob(null); setCoords(null); setGpsError(""); }} className="text-sm text-slate-500 hover:text-red-600 underline">Retake photo</button>
+                ))}
               </div>
             )}
 
-            <button onClick={() => setStep(2)} disabled={!canProceedStep1} className="w-full bg-blue-700 text-white py-4 rounded-2xl font-bold text-base disabled:opacity-40 disabled:cursor-not-allowed hover:bg-blue-800 active:bg-blue-900 transition-colors shadow-md">
+            {gpsLoading && (
+              <div className="bg-blue-50 border border-blue-200 rounded-xl p-4 flex items-center justify-center gap-3">
+                <Loader size={20} className="text-blue-600 animate-spin" />
+                <p className="text-blue-700 text-sm font-medium">Processing Geotag...</p>
+              </div>
+            )}
+
+            {gpsError && (
+              <div className="flex items-start gap-2 bg-yellow-50 border border-yellow-200 rounded-xl p-3">
+                <AlertCircle size={16} className="text-yellow-600 flex-shrink-0 mt-0.5" />
+                <p className="text-yellow-800 text-sm font-medium">{gpsError}</p>
+              </div>
+            )}
+
+            {coords && !gpsLoading && photos.length > 0 && (
+              <div className="flex items-center gap-2 bg-green-50 border border-green-200 rounded-xl p-3">
+                <MapPin size={16} className="text-green-600 flex-shrink-0" />
+                <p className="text-green-700 text-sm font-medium text-xs sm:text-sm">Geotag active: {coords.lat.toFixed(4)}&deg;N, {coords.lng.toFixed(4)}&deg;E</p>
+              </div>
+            )}
+
+            {photos.length < 5 && (
+              <div className="grid grid-cols-2 gap-3">
+                <button onClick={startCamera} className="border-2 border-dashed border-blue-300 rounded-2xl py-6 flex flex-col items-center gap-2 bg-blue-50 hover:bg-blue-100 active:bg-blue-200 transition-colors">
+                  <Camera size={28} className="text-blue-500" />
+                  <p className="text-blue-700 font-bold text-sm">Add Camera</p>
+                </button>
+                <button onClick={() => galleryRef.current?.click()} className="border-2 border-dashed border-slate-300 rounded-2xl py-6 flex flex-col items-center gap-2 bg-slate-50 hover:bg-slate-100 active:bg-slate-200 transition-colors">
+                  <svg xmlns="http://www.w3.org/2000/svg" width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-slate-500"><rect width="18" height="18" x="3" y="3" rx="2" ry="2"/><circle cx="9" cy="9" r="2"/><path d="m21 15-3.086-3.086a2 2 0 0 0-2.828 0L6 21"/></svg>
+                  <p className="text-slate-700 font-bold text-sm">Add Gallery</p>
+                </button>
+              </div>
+            )}
+            {photos.length >= 5 && <p className="text-center text-xs text-slate-400">Maximum 5 photos allowed.</p>}
+
+            <button onClick={() => setStep(2)} disabled={!canProceedStep1} className="w-full bg-blue-700 text-white py-4 rounded-2xl font-bold text-base disabled:opacity-40 disabled:cursor-not-allowed hover:bg-blue-800 active:bg-blue-900 transition-colors shadow-md mt-4">
               Next: Personal Details
             </button>
           </div>
