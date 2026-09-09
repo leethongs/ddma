@@ -5,7 +5,7 @@ import { burnGeotag } from "@/lib/geotag";
 import { Camera, MapPin, CheckCircle, ArrowLeft, Loader, AlertCircle, FileText, User, X } from "lucide-react";
 import Link from "next/link";
 
-const damageTypes = ["Cyclone", "Flash / Flood", "Hailstorm", "Frost / Cold Wave", "Drought", "Pest Attack", "Other"];
+const damageTypes = ["Cyclone", "Flash / Flood", "Hailstorm", "Frost / Cold Wave", "Drought", "Pest Attack", "Landslide", "Other"];
 
 type PhotoItem = { file: File, blob: Blob | null, preview: string };
 
@@ -33,7 +33,7 @@ export default function ReportPage() {
   const assetCategories = {
     "Infrastructure": ["Communication", "Retaining Walls", "Bridges", "Drainage", "Electricity", "Road", "Water Source", "Footpath", "Irrigation Canal"],
     "Housing": ["Pucca House", "Kutcha House", "Huts", "Cattle Sheds"],
-    "Agri Allied Sector": ["Plantation", "Farm", "Fisheries", "Poultry", "Machineries"]
+    "Agri Allied Sector": ["Plantation", "Fisheries", "Animal and Husbandry", "Agri crops", "Horti crops"]
   };
 
   function toggleAsset(asset: string) {
