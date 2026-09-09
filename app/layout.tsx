@@ -1,3 +1,4 @@
+import SplashScreen from '@/components/SplashScreen';
 import type { Metadata, Viewport } from "next";
 import { Poppins } from "next/font/google";
 import "./globals.css";
