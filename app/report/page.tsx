@@ -28,6 +28,17 @@ export default function ReportPage() {
     victim_name: "", contact_number: "", aadhaar_number: "", address: "",
     damage_type: "Cyclone", damage_details: "",
   });
+  const [selectedAssets, setSelectedAssets] = useState<string[]>([]);
+
+  const assetCategories = {
+    "Infrastructure": ["Communication", "Retaining Walls", "Bridges", "Drainage", "Electricity", "Road", "Water Source", "Footpath", "Irrigation Canal"],
+    "Housing": ["Pucca House", "Kutcha House", "Huts", "Cattle Sheds"],
+    "Agri Allied Sector": ["Plantation", "Farm", "Fisheries", "Poultry", "Machineries"]
+  };
+
+  function toggleAsset(asset: string) {
+    setSelectedAssets(prev => prev.includes(asset) ? prev.filter(a => a !== asset) : [...prev, asset]);
+  }
 
   async function startCamera() {
     setShowWebcam(true);
@@ -117,13 +128,18 @@ export default function ReportPage() {
         uploadedUrls.push(urlData.publicUrl);
       }
 
+      let finalDetails = form.damage_details;
+      if (selectedAssets.length > 0) {
+        finalDetails = `Affected Categories: ${selectedAssets.join(", ")}\n\n${form.damage_details}`;
+      }
+
       const { data, error: dbErr } = await supabaseAdmin.from("incidents").insert([{
         victim_name: form.victim_name,
         contact_number: form.contact_number,
         aadhaar_number: form.aadhaar_number || null,
         address: form.address,
         damage_type: form.damage_type,
-        damage_details: form.damage_details,
+        damage_details: finalDetails.trim(),
         photo_url: uploadedUrls.join(",") || null,
         latitude: coords?.lat ?? null,
         longitude: coords?.lng ?? null,
@@ -299,10 +315,29 @@ export default function ReportPage() {
             </div>
 
             <div>
-              <label className="block text-sm font-semibold text-slate-700 mb-1.5">Describe the Damage</label>
-              <textarea placeholder="e.g. House completely flooded, 2 acres crop destroyed..." value={form.damage_details}
+              <label className="block text-sm font-semibold text-slate-700 mb-3">Affected Categories (Select multiple)</label>
+              <div className="space-y-4 bg-white border border-slate-200 rounded-xl p-4">
+                {Object.entries(assetCategories).map(([parent, children]) => (
+                  <div key={parent}>
+                    <p className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-2">{parent}</p>
+                    <div className="flex flex-wrap gap-2">
+                      {children.map(child => (
+                        <button key={child} onClick={() => toggleAsset(child)}
+                          className={`py-1.5 px-3 rounded-full border text-sm font-medium transition-colors ${selectedAssets.includes(child) ? 'bg-blue-600 text-white border-blue-600 shadow-sm' : 'bg-slate-50 text-slate-600 border-slate-200 hover:border-blue-300'}`}>
+                          {child}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            <div>
+              <label className="block text-sm font-semibold text-slate-700 mb-1.5">Additional Details</label>
+              <textarea placeholder="Describe the damage in your own words..." value={form.damage_details}
                 onChange={e => setForm(p => ({ ...p, damage_details: e.target.value }))}
-                className="w-full border-2 border-slate-200 rounded-xl px-4 py-3 text-base focus:outline-none focus:border-blue-500 transition-colors h-32 resize-none bg-white" />
+                className="w-full border-2 border-slate-200 rounded-xl px-4 py-3 text-base focus:outline-none focus:border-blue-500 transition-colors h-24 resize-none bg-white" />
             </div>
 
             {error && (
