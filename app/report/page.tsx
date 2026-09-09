@@ -1,8 +1,8 @@
 "use client";
-import { useState, useRef } from "react";
+import { useState, useRef, useEffect } from "react";
 import { supabase, supabaseAdmin } from "@/lib/supabase";
 import { burnGeotag } from "@/lib/geotag";
-import { Camera, MapPin, CheckCircle, ArrowLeft, Loader, AlertCircle, FileText, User } from "lucide-react";
+import { Camera, MapPin, CheckCircle, ArrowLeft, Loader, AlertCircle, FileText, User, X } from "lucide-react";
 import Link from "next/link";
 
 const damageTypes = ["Flood", "Cyclone", "Earthquake", "Fire", "Landslide", "Other"];
@@ -18,7 +18,10 @@ export default function ReportPage() {
   const [submitting, setSubmitting] = useState(false);
   const [claimId, setClaimId] = useState("");
   const [error, setError] = useState("");
-  const cameraRef = useRef<HTMLInputElement>(null);
+  
+  // WebRTC Camera State
+  const [showWebcam, setShowWebcam] = useState(false);
+  const videoRef = useRef<HTMLVideoElement>(null);
   const galleryRef = useRef<HTMLInputElement>(null);
 
   const [form, setForm] = useState({
@@ -26,8 +29,54 @@ export default function ReportPage() {
     damage_type: "Flood", damage_details: "",
   });
 
-  async function handlePhotoCapture(e: React.ChangeEvent<HTMLInputElement>) {
-    const file = e.target.files?.[0];
+  // Start the HTML5 In-App Camera
+  async function startCamera() {
+    setShowWebcam(true);
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ 
+        video: { facingMode: { ideal: "environment" } },
+        audio: false 
+      });
+      if (videoRef.current) {
+        videoRef.current.srcObject = stream;
+        videoRef.current.play();
+      }
+    } catch (err) {
+      alert("Camera access denied by browser. Please use Gallery.");
+      setShowWebcam(false);
+    }
+  }
+
+  // Stop the HTML5 Camera
+  function stopCamera() {
+    if (videoRef.current && videoRef.current.srcObject) {
+      const stream = videoRef.current.srcObject as MediaStream;
+      stream.getTracks().forEach(track => track.stop());
+    }
+    setShowWebcam(false);
+  }
+
+  // Take a snap from the video feed
+  function takeSnap() {
+    if (!videoRef.current) return;
+    const canvas = document.createElement("canvas");
+    canvas.width = videoRef.current.videoWidth;
+    canvas.height = videoRef.current.videoHeight;
+    const ctx = canvas.getContext("2d");
+    if (!ctx) return;
+    ctx.drawImage(videoRef.current, 0, 0);
+    
+    canvas.toBlob(blob => {
+      if (blob) {
+        const file = new File([blob], "snap.jpg", { type: "image/jpeg" });
+        stopCamera();
+        processFile(file);
+      }
+    }, "image/jpeg", 0.9);
+  }
+
+  // Common file processor for both Camera Snap and Gallery
+  function processFile(file: File) {
     if (!file) return;
     setPhoto(file);
     setGpsLoading(true);
@@ -47,7 +96,7 @@ export default function ReportPage() {
         setGpsLoading(false);
       },
       (err) => {
-        setGpsError("Warning: GPS Location unavailable (permission blocked or turned off). You can still proceed without coordinates.");
+        setGpsError("Warning: GPS Location blocked or turned off in phone menu. You can still proceed without coordinates.");
         setGpsLoading(false);
         setPhotoPreview(URL.createObjectURL(file));
       },
@@ -63,7 +112,7 @@ export default function ReportPage() {
       let photoUrl = "";
       if (uploadBlob) {
         const fname = "incident-" + Date.now() + ".jpg";
-        const { data, error: uploadErr } = await supabaseAdmin.storage.from("incident-photos").upload(fname, uploadBlob, { contentType: "image/jpeg" });
+        const { error: uploadErr } = await supabaseAdmin.storage.from("incident-photos").upload(fname, uploadBlob, { contentType: "image/jpeg" });
         if (uploadErr) throw uploadErr;
         const { data: urlData } = supabaseAdmin.storage.from("incident-photos").getPublicUrl(fname);
         photoUrl = urlData.publicUrl;
@@ -93,7 +142,25 @@ export default function ReportPage() {
   const canProceedStep2 = form.victim_name.trim() && form.contact_number.trim().length === 10 && form.address.trim();
 
   return (
-    <div className="min-h-screen bg-slate-50 flex flex-col">
+    <div className="min-h-screen bg-slate-50 flex flex-col relative">
+      
+      {/* Fullscreen WebRTC Camera UI */}
+      {showWebcam && (
+        <div className="fixed inset-0 z-50 bg-black flex flex-col">
+          <div className="flex justify-between items-center p-4 text-white z-10 absolute top-0 w-full bg-gradient-to-b from-black/60 to-transparent">
+            <button onClick={stopCamera} className="p-2 bg-black/50 rounded-full"><X size={24} /></button>
+            <p className="font-bold">In-App Camera</p>
+            <div className="w-10"></div>
+          </div>
+          <video ref={videoRef} playsInline autoPlay className="flex-1 w-full h-full object-cover" />
+          <div className="absolute bottom-0 w-full p-8 flex justify-center bg-gradient-to-t from-black/80 to-transparent">
+            <button onClick={takeSnap} className="w-20 h-20 bg-white rounded-full border-4 border-slate-300 shadow-xl flex items-center justify-center active:scale-95 transition-transform">
+              <div className="w-16 h-16 bg-white border border-slate-200 rounded-full"></div>
+            </button>
+          </div>
+        </div>
+      )}
+
       {/* Header */}
       <header className="bg-blue-700 text-white px-5 py-4 flex items-center gap-3 shadow-md sticky top-0 z-10">
         <Link href="/" className="text-blue-200 hover:text-white"><ArrowLeft size={22} /></Link>
@@ -121,23 +188,24 @@ export default function ReportPage() {
               <p className="text-slate-500 text-sm">Photo will be automatically geotagged with your GPS coordinates.</p>
             </div>
 
-            <input ref={cameraRef} type="file" accept="image/*" capture="environment" className="hidden" onChange={handlePhotoCapture} />
-            <input ref={galleryRef} type="file" accept="image/*" className="hidden" onChange={handlePhotoCapture} />
+            <input ref={galleryRef} type="file" accept="image/*" className="hidden" onChange={(e) => {
+              if (e.target.files?.[0]) processFile(e.target.files[0]);
+            }} />
 
             {!photo ? (
               <div className="grid grid-cols-2 gap-3">
-                <button onClick={() => cameraRef.current?.click()} className="border-2 border-dashed border-blue-300 rounded-2xl py-10 flex flex-col items-center gap-3 bg-blue-50 hover:bg-blue-100 active:bg-blue-200 transition-colors">
+                <button onClick={startCamera} className="border-2 border-dashed border-blue-300 rounded-2xl py-10 flex flex-col items-center gap-3 bg-blue-50 hover:bg-blue-100 active:bg-blue-200 transition-colors">
                   <Camera size={36} className="text-blue-500" />
                   <div>
                     <p className="text-blue-700 font-bold text-sm">Open Camera</p>
-                    <p className="text-blue-400 text-[10px] mt-1 px-2">May reload older phones</p>
+                    <p className="text-blue-400 text-[10px] mt-1 px-2">Now built-in! No crashes.</p>
                   </div>
                 </button>
                 <button onClick={() => galleryRef.current?.click()} className="border-2 border-dashed border-slate-300 rounded-2xl py-10 flex flex-col items-center gap-3 bg-slate-50 hover:bg-slate-100 active:bg-slate-200 transition-colors">
                   <svg xmlns="http://www.w3.org/2000/svg" width="36" height="36" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-slate-500"><rect width="18" height="18" x="3" y="3" rx="2" ry="2"/><circle cx="9" cy="9" r="2"/><path d="m21 15-3.086-3.086a2 2 0 0 0-2.828 0L6 21"/></svg>
                   <div>
                     <p className="text-slate-700 font-bold text-sm">Upload from Gallery</p>
-                    <p className="text-slate-400 text-[10px] mt-1 px-2">Recommended</p>
+                    <p className="text-slate-400 text-[10px] mt-1 px-2">Choose existing photo</p>
                   </div>
                 </button>
               </div>
