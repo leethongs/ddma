@@ -8,7 +8,9 @@ self.addEventListener("push", (e) => {
     body: data.message || "New disaster alert received.",
     icon: "/icons/icon-192.png",
     badge: "/icons/icon-192.png",
-    vibrate: [200, 100, 200, 100, 200, 100, 200],
+    vibrate: [500, 250, 500, 250, 500],
+    requireInteraction: true,
+    silent: false,
     data: { url: "/alerts" }
   };
   e.waitUntil(self.registration.showNotification(title, options));

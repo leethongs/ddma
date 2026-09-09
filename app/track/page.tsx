@@ -18,6 +18,21 @@ export default function TrackPage() {
   const [searched, setSearched] = useState(false);
   const [loading, setLoading] = useState(false);
 
+  async function forceDownload(url: string) {
+    try {
+      const res = await fetch(url);
+      const blob = await res.blob();
+      const a = document.createElement("a");
+      a.href = URL.createObjectURL(blob);
+      a.download = "DDMA_Compensation_Form.pdf";
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+    } catch {
+      window.open(url, "_blank");
+    }
+  }
+
   async function handleSearch() {
     if (phone.trim().length !== 10) return;
     setLoading(true);
@@ -98,9 +113,9 @@ export default function TrackPage() {
                       <p className="text-green-800 font-bold text-base flex items-center gap-2 mb-2"><CheckCircle size={20} />Claim Approved</p>
                       {claim.compensation_amount && <p className="text-green-700 text-sm">Approved Amount: <span className="font-bold text-lg">Rs. {claim.compensation_amount.toLocaleString("en-IN")}</span></p>}
                       {claim.compensation_form_url && (
-                        <a href={claim.compensation_form_url} target="_blank" className="mt-4 flex items-center justify-center gap-2 bg-white border-2 border-green-300 text-green-700 py-3 px-4 rounded-xl font-bold hover:bg-green-100 transition-colors shadow-sm">
+                        <button onClick={() => forceDownload(claim.compensation_form_url!)} className="mt-4 w-full flex items-center justify-center gap-2 bg-white border-2 border-green-300 text-green-700 py-3 px-4 rounded-xl font-bold hover:bg-green-100 transition-colors shadow-sm">
                           <Download size={18} />Download Official Form
-                        </a>
+                        </button>
                       )}
                     </div>
                   )}
