@@ -47,7 +47,7 @@ export default function ReportPage() {
         setGpsLoading(false);
       },
       (err) => {
-        setGpsError("Location access denied. Please enable GPS and try again.");
+        setGpsError("Location denied. Please turn ON your phone's GPS/Location from the top menu, then refresh the page.");
         setGpsLoading(false);
         setPhotoPreview(URL.createObjectURL(file));
       },
@@ -121,7 +121,7 @@ export default function ReportPage() {
               <p className="text-slate-500 text-sm">Photo will be automatically geotagged with your GPS location.</p>
             </div>
 
-            <input ref={fileRef} type="file" accept="image/*"  className="hidden" onChange={handlePhotoCapture} />
+            <input ref={fileRef} type="file" accept="image/*"  capture="environment" className="hidden" onChange={handlePhotoCapture} />
 
             {!photo ? (
               <button onClick={() => fileRef.current?.click()} className="w-full border-2 border-dashed border-blue-300 rounded-2xl py-14 flex flex-col items-center gap-3 bg-blue-50 hover:bg-blue-100 active:bg-blue-200 transition-colors">
