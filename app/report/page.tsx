@@ -89,7 +89,7 @@ export default function ReportPage() {
     setSubmitting(false);
   }
 
-  const canProceedStep1 = photo && !gpsLoading && coords;
+  const canProceedStep1 = !!photo && !gpsLoading;
   const canProceedStep2 = form.victim_name.trim() && form.contact_number.trim().length === 10 && form.address.trim();
 
   return (
@@ -121,7 +121,7 @@ export default function ReportPage() {
               <p className="text-slate-500 text-sm">Photo will be automatically geotagged with your GPS location.</p>
             </div>
 
-            <input ref={fileRef} type="file" accept="image/*" capture="environment" className="hidden" onChange={handlePhotoCapture} />
+            <input ref={fileRef} type="file" accept="image/*"  className="hidden" onChange={handlePhotoCapture} />
 
             {!photo ? (
               <button onClick={() => fileRef.current?.click()} className="w-full border-2 border-dashed border-blue-300 rounded-2xl py-14 flex flex-col items-center gap-3 bg-blue-50 hover:bg-blue-100 active:bg-blue-200 transition-colors">
