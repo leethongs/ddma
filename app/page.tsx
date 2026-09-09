@@ -1,69 +1,122 @@
-import Image from "next/image";
+"use client";
+import { useEffect, useState } from "react";
+import { supabase } from "@/lib/supabase";
+import Link from "next/link";
+import { AlertTriangle, FileText, Search, Phone, Shield, ChevronRight, X } from "lucide-react";
+
+interface Alert { id: string; title: string; message: string; severity: string; affected_area?: string; }
+interface Setting { key: string; value: string; }
 
 export default function Home() {
+  const [alerts, setAlerts] = useState<Alert[]>([]);
+  const [settings, setSettings] = useState<Record<string, string>>({});
+  const [showAlerts, setShowAlerts] = useState(true);
+
+  useEffect(() => {
+    fetch("/api/setup").then(() => {
+      supabase.from("alerts").select("*").eq("is_active", true).then(({ data }) => setAlerts(data ?? []));
+      supabase.from("settings").select("*").then(({ data }) => {
+        const map: Record<string, string> = {};
+        (data as Setting[] ?? []).forEach(s => { map[s.key] = s.value; });
+        setSettings(map);
+      });
+    });
+  }, []);
+
+  const sosNumber = settings["sos_number"] ?? "1078";
+  const districtName = settings["district_name"] ?? "District Disaster Management Authority";
+
+  const severityColor: Record<string, string> = { critical: "bg-red-600", high: "bg-orange-500", medium: "bg-yellow-500", low: "bg-blue-400" };
+
   return (
-    <div className="flex flex-col flex-1 items-center justify-center bg-zinc-50 font-sans dark:bg-black">
-      <main className="flex flex-1 w-full max-w-3xl flex-col items-center justify-between py-32 px-16 bg-white dark:bg-black sm:items-start">
-        <Image
-          className="dark:invert h-5 w-[100px]"
-          src="/next.svg"
-          alt="Next.js logo"
-          width={100}
-          height={20}
-          priority
-        />
-        <div className="flex flex-col items-center gap-6 text-center sm:items-start sm:text-left">
-          <h1 className="max-w-xs text-3xl font-semibold leading-10 tracking-tight text-black dark:text-zinc-50">
-            To get started, edit the{" "}
-            <code className="rounded bg-black/[.06] px-1.5 py-0.5 font-mono text-[0.9em] dark:bg-white/[.08]">
-              page.tsx
-            </code>{" "}
-            file.
-          </h1>
-          <p className="max-w-md text-lg leading-8 text-zinc-600 dark:text-zinc-400">
-            Looking for a starting point or more instructions? Head over to{" "}
-            <a
-              href="https://vercel.com/templates?framework=next.js&utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              className="font-medium text-zinc-950 dark:text-zinc-50"
-            >
-              Templates
-            </a>{" "}
-            or the{" "}
-            <a
-              href="https://nextjs.org/learn?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              className="font-medium text-zinc-950 dark:text-zinc-50"
-            >
-              Learning
-            </a>{" "}
-            center.
-          </p>
+    <div className="min-h-screen bg-white flex flex-col">
+      {/* Header */}
+      <header className="bg-blue-700 text-white px-5 py-4 flex items-center gap-3 shadow-lg">
+        <div className="bg-white rounded-xl p-2"><Shield size={22} className="text-blue-700" /></div>
+        <div>
+          <p className="font-bold text-base leading-tight">DDMA</p>
+          <p className="text-blue-200 text-xs leading-tight">{districtName}</p>
         </div>
-        <div className="flex flex-col gap-4 text-base font-medium sm:flex-row">
-          <a
-            className="flex h-12 w-full items-center justify-center gap-2 rounded-full bg-foreground px-5 text-background transition-colors hover:bg-[#383838] dark:hover:bg-[#ccc] md:w-[158px]"
-            href="https://vercel.com/new?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            <Image
-              className="dark:invert h-[14px] w-4"
-              src="/vercel.svg"
-              alt="Vercel logomark"
-              width={16}
-              height={14}
-            />
-            Deploy Now
+      </header>
+
+      {/* Active Alerts Banner */}
+      {showAlerts && alerts.length > 0 && (
+        <div className="bg-red-600 text-white px-5 py-3">
+          <div className="flex items-start justify-between gap-2">
+            <div className="flex items-start gap-2 flex-1">
+              <AlertTriangle size={18} className="mt-0.5 flex-shrink-0 animate-pulse" />
+              <div className="text-sm">
+                <p className="font-semibold">{alerts[0].title}</p>
+                <p className="text-red-100 text-xs mt-0.5">{alerts[0].message}</p>
+                {alerts.length > 1 && <p className="text-red-200 text-xs mt-1">+{alerts.length - 1} more alert(s) active</p>}
+              </div>
+            </div>
+            <button onClick={() => setShowAlerts(false)} className="text-red-200 hover:text-white flex-shrink-0"><X size={16} /></button>
+          </div>
+        </div>
+      )}
+
+      {/* Main Content */}
+      <main className="flex-1 px-5 py-8">
+        {/* SOS Button */}
+        <div className="mb-8">
+          <a href={"tel:" + sosNumber} className="block w-full bg-red-600 hover:bg-red-700 active:bg-red-800 text-white rounded-2xl py-5 text-center shadow-lg transition-all active:scale-95">
+            <div className="flex items-center justify-center gap-3">
+              <Phone size={28} className="animate-bounce" />
+              <div>
+                <p className="text-2xl font-bold tracking-wide">SOS HELPLINE</p>
+                <p className="text-red-100 text-sm font-medium">{sosNumber} • Available 24x7</p>
+              </div>
+            </div>
           </a>
-          <a
-            className="flex h-12 w-full items-center justify-center rounded-full border border-solid border-black/[.08] px-5 transition-colors hover:border-transparent hover:bg-black/[.04] dark:border-white/[.145] dark:hover:bg-[#1a1a1a] md:w-[158px]"
-            href="https://nextjs.org/docs?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            Documentation
-          </a>
+        </div>
+
+        {/* Action Cards */}
+        <p className="text-slate-500 text-xs font-semibold uppercase tracking-widest mb-3">What do you need?</p>
+        <div className="space-y-4 mb-8">
+          <Link href="/report" className="block bg-blue-700 hover:bg-blue-800 active:bg-blue-900 text-white rounded-2xl p-5 shadow-md transition-all active:scale-95">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-4">
+                <div className="bg-blue-600 rounded-xl p-3"><FileText size={24} /></div>
+                <div>
+                  <p className="font-bold text-lg">Report Damage</p>
+                  <p className="text-blue-200 text-sm">Submit your disaster damage report</p>
+                </div>
+              </div>
+              <ChevronRight size={20} className="text-blue-300" />
+            </div>
+          </Link>
+
+          <Link href="/track" className="block bg-white hover:bg-slate-50 active:bg-slate-100 text-slate-800 rounded-2xl p-5 shadow-md border-2 border-blue-100 transition-all active:scale-95">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-4">
+                <div className="bg-blue-50 rounded-xl p-3"><Search size={24} className="text-blue-700" /></div>
+                <div>
+                  <p className="font-bold text-lg">Track My Claim</p>
+                  <p className="text-slate-500 text-sm">Check status by phone number</p>
+                </div>
+              </div>
+              <ChevronRight size={20} className="text-slate-300" />
+            </div>
+          </Link>
+        </div>
+
+        {/* Info Cards */}
+        <p className="text-slate-500 text-xs font-semibold uppercase tracking-widest mb-3">Emergency Numbers</p>
+        <div className="grid grid-cols-3 gap-3">
+          {[["Police", "100", "bg-blue-600"], ["Ambulance", "108", "bg-red-600"], ["Fire", "101", "bg-orange-500"]].map(([name, num, color]) => (
+            <a key={num} href={"tel:" + num} className={"rounded-xl p-3 text-center text-white " + color + " active:opacity-80 transition-opacity"}>
+              <p className="font-bold text-xl">{num}</p>
+              <p className="text-xs opacity-90 mt-0.5">{name}</p>
+            </a>
+          ))}
         </div>
       </main>
+
+      {/* Footer */}
+      <footer className="text-center text-slate-400 text-xs py-4 px-5 border-t border-slate-100">
+        <p>DDMA • {new Date().getFullYear()} • {settings["helpline_info"] ?? "Available 24x7"}</p>
+      </footer>
     </div>
   );
 }
