@@ -1,25 +1,25 @@
 "use client";
 import { useState, useRef } from "react";
+import { supabase, supabaseAdmin } from "@/lib/supabase";
 import { burnGeotag } from "@/lib/geotag";
-import { supabaseAdmin } from "@/lib/supabase";
-import { ArrowLeft, Camera, MapPin, User, FileText, CheckCircle, Loader, AlertCircle } from "lucide-react";
+import { Camera, MapPin, CheckCircle, ArrowLeft, Loader, AlertCircle, FileText, User } from "lucide-react";
 import Link from "next/link";
 
-const damageTypes = ["Flood","Cyclone","Earthquake","Landslide","Fire","Drought","Lightning","Other"];
-type Step = 1 | 2 | 3 | "done";
+const damageTypes = ["Flood", "Cyclone", "Earthquake", "Fire", "Landslide", "Other"];
 
 export default function ReportPage() {
-  const [step, setStep] = useState<Step>(1);
+  const [step, setStep] = useState<number | "done">(1);
   const [photo, setPhoto] = useState<File | null>(null);
-  const [geotaggedBlob, setGeotaggedBlob] = useState<Blob | null>(null);
   const [photoPreview, setPhotoPreview] = useState<string>("");
+  const [geotaggedBlob, setGeotaggedBlob] = useState<Blob | null>(null);
   const [gpsLoading, setGpsLoading] = useState(false);
   const [gpsError, setGpsError] = useState("");
-  const [coords, setCoords] = useState<{ lat: number; lng: number } | null>(null);
+  const [coords, setCoords] = useState<{ lat: number, lng: number } | null>(null);
   const [submitting, setSubmitting] = useState(false);
   const [claimId, setClaimId] = useState("");
   const [error, setError] = useState("");
-  const cameraRef = useRef<HTMLInputElement>(null);`n  const galleryRef = useRef<HTMLInputElement>(null);
+  const cameraRef = useRef<HTMLInputElement>(null);
+  const galleryRef = useRef<HTMLInputElement>(null);
 
   const [form, setForm] = useState({
     victim_name: "", contact_number: "", aadhaar_number: "", address: "",
@@ -63,7 +63,7 @@ export default function ReportPage() {
       let photoUrl = "";
       if (uploadBlob) {
         const fname = "incident-" + Date.now() + ".jpg";
-        const { data, error: uploadErr } = await supabaseAdmin.storage.from("incident-photos").upload(fname, uploadBlob, { contentType: "image/jpeg", upsert: true });
+        const { data, error: uploadErr } = await supabaseAdmin.storage.from("incident-photos").upload(fname, uploadBlob, { contentType: "image/jpeg" });
         if (uploadErr) throw uploadErr;
         const { data: urlData } = supabaseAdmin.storage.from("incident-photos").getPublicUrl(fname);
         photoUrl = urlData.publicUrl;
@@ -107,7 +107,7 @@ export default function ReportPage() {
       {step !== "done" && (
         <div className="flex bg-blue-700 pb-3 px-5 gap-2">
           {[1,2,3].map(s => (
-            <div key={s} className={"h-1.5 flex-1 rounded-full transition-all " + (Number(step) >= s ? "bg-white" : "bg-blue-500")} />
+            <div key={s} className={"h-1.5 flex-1 rounded-full transition-all " + (Number(step) >= s ? "bg-white" : "bg-blue-900")} />
           ))}
         </div>
       )}
@@ -118,17 +118,29 @@ export default function ReportPage() {
           <div className="space-y-5">
             <div>
               <h2 className="text-xl font-bold text-slate-800 mb-1">Take a Photo</h2>
-              <p className="text-slate-500 text-sm">Photo will be automatically geotagged with your GPS location.</p>
+              <p className="text-slate-500 text-sm">Photo will be automatically geotagged with your GPS coordinates.</p>
             </div>
 
-            <input ref={fileRef} type="file" accept="image/*"  capture="environment" className="hidden" onChange={handlePhotoCapture} />
+            <input ref={cameraRef} type="file" accept="image/*" capture="environment" className="hidden" onChange={handlePhotoCapture} />
+            <input ref={galleryRef} type="file" accept="image/*" className="hidden" onChange={handlePhotoCapture} />
 
             {!photo ? (
-              <button onClick={() => fileRef.current?.click()} className="w-full border-2 border-dashed border-blue-300 rounded-2xl py-14 flex flex-col items-center gap-3 bg-blue-50 hover:bg-blue-100 active:bg-blue-200 transition-colors">
-                <Camera size={48} className="text-blue-400" />
-                <p className="text-blue-700 font-semibold">Open Camera</p>
-                <p className="text-blue-400 text-xs">Tap to take or select a photo</p><p className="text-blue-300 text-[10px] mt-2 px-4 text-center">Tip: If your phone reloads when using the Camera, take a photo normally first, then choose Gallery.</p>
-              </button>
+              <div className="grid grid-cols-2 gap-3">
+                <button onClick={() => cameraRef.current?.click()} className="border-2 border-dashed border-blue-300 rounded-2xl py-10 flex flex-col items-center gap-3 bg-blue-50 hover:bg-blue-100 active:bg-blue-200 transition-colors">
+                  <Camera size={36} className="text-blue-500" />
+                  <div>
+                    <p className="text-blue-700 font-bold text-sm">Open Camera</p>
+                    <p className="text-blue-400 text-[10px] mt-1 px-2">May reload older phones</p>
+                  </div>
+                </button>
+                <button onClick={() => galleryRef.current?.click()} className="border-2 border-dashed border-slate-300 rounded-2xl py-10 flex flex-col items-center gap-3 bg-slate-50 hover:bg-slate-100 active:bg-slate-200 transition-colors">
+                  <svg xmlns="http://www.w3.org/2000/svg" width="36" height="36" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-slate-500"><rect width="18" height="18" x="3" y="3" rx="2" ry="2"/><circle cx="9" cy="9" r="2"/><path d="m21 15-3.086-3.086a2 2 0 0 0-2.828 0L6 21"/></svg>
+                  <div>
+                    <p className="text-slate-700 font-bold text-sm">Upload from Gallery</p>
+                    <p className="text-slate-400 text-[10px] mt-1 px-2">Recommended</p>
+                  </div>
+                </button>
+              </div>
             ) : (
               <div className="space-y-3">
                 <div className="relative rounded-2xl overflow-hidden shadow-md">
@@ -152,7 +164,7 @@ export default function ReportPage() {
                 {coords && !gpsLoading && (
                   <div className="flex items-center gap-2 bg-green-50 border border-green-200 rounded-xl p-3">
                     <MapPin size={16} className="text-green-600" />
-                    <p className="text-green-700 text-sm font-medium">{coords.lat.toFixed(5)}&deg;N, {coords.lng.toFixed(5)}&deg;E &mdash; Geotagged &amp; burned into photo</p>
+                    <p className="text-green-700 text-sm font-medium">{coords.lat.toFixed(5)}&deg;N, {coords.lng.toFixed(5)}&deg;E &mdash; Geotagged</p>
                   </div>
                 )}
 
@@ -217,7 +229,7 @@ export default function ReportPage() {
 
             <div>
               <label className="block text-sm font-semibold text-slate-700 mb-1.5">Describe the Damage</label>
-              <textarea placeholder="e.g. House completely flooded, 2 acres crop destroyed, livestock lost..." value={form.damage_details}
+              <textarea placeholder="e.g. House completely flooded, 2 acres crop destroyed..." value={form.damage_details}
                 onChange={e => setForm(p => ({ ...p, damage_details: e.target.value }))}
                 className="w-full border-2 border-slate-200 rounded-xl px-4 py-3 text-base focus:outline-none focus:border-blue-500 transition-colors h-32 resize-none bg-white" />
             </div>
@@ -249,14 +261,13 @@ export default function ReportPage() {
             </div>
             <div>
               <h2 className="text-2xl font-bold text-slate-800 mb-2">Report Submitted!</h2>
-              <p className="text-slate-500 text-base">Your damage report has been received by DDMA.</p>
+              <p className="text-slate-500 text-base">Your damage report has been received.</p>
             </div>
             <div className="bg-blue-50 border-2 border-blue-200 rounded-2xl p-5">
-              <p className="text-blue-600 text-sm font-semibold mb-1">Your Claim Reference</p>
+              <p className="text-blue-600 text-sm font-semibold mb-1">Claim Reference</p>
               <p className="text-3xl font-bold text-blue-700 tracking-widest font-mono">{claimId}</p>
-              <p className="text-blue-500 text-xs mt-2">Track using your mobile number: {form.contact_number}</p>
+              <p className="text-blue-500 text-xs mt-2">Track using mobile: {form.contact_number}</p>
             </div>
-            <p className="text-slate-500 text-sm">You will be notified once your claim is reviewed. Average processing time is 3-5 working days.</p>
             <div className="flex flex-col gap-3">
               <Link href="/track" className="block w-full bg-blue-700 text-white py-3.5 rounded-2xl font-bold hover:bg-blue-800 transition-colors shadow-md">Track My Claim</Link>
               <Link href="/" className="block w-full border-2 border-slate-200 text-slate-600 py-3.5 rounded-2xl font-bold hover:bg-slate-50">Back to Home</Link>
