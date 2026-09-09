@@ -92,9 +92,15 @@ export default function Home() {
             </div>
           </div>
           <div className="grid grid-cols-2 gap-3">
-            {["03702270129", "03702270130", "1070", "112"].map(num => (
-              <a key={num} href={`tel:${num}`} className="bg-white text-red-700 font-bold text-center py-3 rounded-xl shadow-sm hover:bg-red-50 transition-colors active:scale-95 text-lg">
-                {num}
+            {[
+              { num: "03702270129", label: "03702270129" },
+              { num: "03702270130", label: "03702270130" },
+              { num: "1070", label: "1070", sub: "(Toll Free)" },
+              { num: "112", label: "112", sub: "(ERSS)" }
+            ].map(({ num, label, sub }) => (
+              <a key={num} href={`tel:${num}`} className="flex flex-col items-center justify-center bg-white text-red-700 font-bold py-2.5 rounded-xl shadow-sm hover:bg-red-50 transition-colors active:scale-95">
+                <span className="text-lg leading-tight">{label}</span>
+                {sub && <span className="text-[11px] text-red-500 uppercase font-bold leading-tight mt-0.5">{sub}</span>}
               </a>
             ))}
           </div>
