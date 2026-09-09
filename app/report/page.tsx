@@ -47,7 +47,7 @@ export default function ReportPage() {
         setGpsLoading(false);
       },
       (err) => {
-        setGpsError("Location denied. Please turn ON your phone's GPS/Location from the top menu, then refresh the page.");
+        setGpsError("Warning: GPS Location unavailable (permission blocked or turned off). You can still proceed without coordinates.");
         setGpsLoading(false);
         setPhotoPreview(URL.createObjectURL(file));
       },
@@ -127,7 +127,7 @@ export default function ReportPage() {
               <button onClick={() => fileRef.current?.click()} className="w-full border-2 border-dashed border-blue-300 rounded-2xl py-14 flex flex-col items-center gap-3 bg-blue-50 hover:bg-blue-100 active:bg-blue-200 transition-colors">
                 <Camera size={48} className="text-blue-400" />
                 <p className="text-blue-700 font-semibold">Open Camera</p>
-                <p className="text-blue-400 text-xs">Tap to take photo of damage</p>
+                <p className="text-blue-400 text-xs">Tap to take or select a photo</p><p className="text-blue-300 text-[10px] mt-2 px-4 text-center">Tip: If your phone reloads when using the Camera, take a photo normally first, then choose Gallery.</p>
               </button>
             ) : (
               <div className="space-y-3">
@@ -143,9 +143,9 @@ export default function ReportPage() {
                 </div>
 
                 {gpsError && (
-                  <div className="flex items-start gap-2 bg-red-50 border border-red-200 rounded-xl p-3">
-                    <AlertCircle size={16} className="text-red-500 flex-shrink-0 mt-0.5" />
-                    <p className="text-red-700 text-sm">{gpsError}</p>
+                  <div className="flex items-start gap-2 bg-yellow-50 border border-yellow-200 rounded-xl p-3">
+                    <AlertCircle size={16} className="text-yellow-600 flex-shrink-0 mt-0.5" />
+                    <p className="text-yellow-800 text-sm font-medium">{gpsError}</p>
                   </div>
                 )}
 
@@ -223,7 +223,7 @@ export default function ReportPage() {
             </div>
 
             {error && (
-              <div className="flex items-start gap-2 bg-red-50 border border-red-200 rounded-xl p-3">
+              <div className="flex items-start gap-2 bg-yellow-50 border border-yellow-200 rounded-xl p-3">
                 <AlertCircle size={16} className="text-red-500 mt-0.5" />
                 <p className="text-red-700 text-sm">{error}</p>
               </div>
