@@ -5,7 +5,7 @@ import { burnGeotag } from "@/lib/geotag";
 import { Camera, MapPin, CheckCircle, ArrowLeft, Loader, AlertCircle, FileText, User, X } from "lucide-react";
 import Link from "next/link";
 
-const damageTypes = ["Flood", "Cyclone", "Earthquake", "Fire", "Landslide", "Other"];
+const damageTypes = ["Cyclone", "Flash / Flood", "Hailstorm", "Frost / Cold Wave", "Drought", "Pest Attack", "Other"];
 
 type PhotoItem = { file: File, blob: Blob | null, preview: string };
 
@@ -26,7 +26,7 @@ export default function ReportPage() {
 
   const [form, setForm] = useState({
     victim_name: "", contact_number: "", aadhaar_number: "", address: "",
-    damage_type: "Flood", damage_details: "",
+    damage_type: "Cyclone", damage_details: "",
   });
 
   async function startCamera() {

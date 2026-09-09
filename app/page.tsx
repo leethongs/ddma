@@ -83,16 +83,21 @@ export default function Home() {
       )}
 
       <main className="flex-1 px-5 py-8">
-        <div className="mb-8">
-          <a href={"tel:" + sosNumber} className="block w-full bg-red-600 hover:bg-red-700 active:bg-red-800 text-white rounded-2xl py-5 text-center shadow-lg transition-all active:scale-95">
-            <div className="flex items-center justify-center gap-3">
-              <Phone size={28} className="animate-bounce" />
-              <div>
-                <p className="text-2xl font-bold tracking-wide">SOS HELPLINE</p>
-                <p className="text-red-100 text-sm font-medium">{sosNumber} • Available 24x7</p>
-              </div>
+        <div className="bg-red-600 text-white rounded-2xl p-5 shadow-lg mb-8">
+          <div className="flex items-center justify-center gap-3 mb-5">
+            <Phone size={28} className="animate-bounce" />
+            <div>
+              <p className="text-xl font-bold tracking-wide">SEOC HELPLINE</p>
+              <p className="text-red-100 text-sm font-medium">Available 24x7 • Tap to call</p>
             </div>
-          </a>
+          </div>
+          <div className="grid grid-cols-2 gap-3">
+            {["03702270129", "03702270130", "1070", "112"].map(num => (
+              <a key={num} href={`tel:${num}`} className="bg-white text-red-700 font-bold text-center py-3 rounded-xl shadow-sm hover:bg-red-50 transition-colors active:scale-95 text-lg">
+                {num}
+              </a>
+            ))}
+          </div>
         </div>
 
         <p className="text-slate-500 text-xs font-semibold uppercase tracking-widest mb-3">What do you need?</p>
