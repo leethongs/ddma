@@ -16,6 +16,15 @@ export default function ReportPage() {
   const [gpsError, setGpsError] = useState("");
   const [coords, setCoords] = useState<{ lat: number, lng: number } | null>(null);
   const [submitting, setSubmitting] = useState(false);
+
+  const [videoBlob, setVideoBlob] = useState<Blob | null>(null);
+  const [isRecording, setIsRecording] = useState(false);
+  const [recordingTime, setRecordingTime] = useState(20);
+  const mediaRecorderRef = useRef<MediaRecorder | null>(null);
+  const videoChunksRef = useRef<BlobPart[]>([]);
+  const videoStreamRef = useRef<MediaStream | null>(null);
+  const videoPreviewRef = useRef<HTMLVideoElement>(null);
+
   const [claimId, setClaimId] = useState("");
   const [error, setError] = useState("");
   
@@ -258,6 +267,34 @@ export default function ReportPage() {
               </div>
             )}
             {photos.length >= 5 && <p className="text-center text-xs text-slate-400">Maximum 5 photos allowed.</p>}
+
+            {/* Video Recording UI */}
+            {isRecording ? (
+              <div className="bg-black rounded-2xl overflow-hidden relative aspect-video">
+                <video ref={videoPreviewRef} autoPlay playsInline muted className="w-full h-full object-cover" />
+                <div className="absolute top-4 right-4 bg-red-600 text-white px-3 py-1 rounded-full text-sm font-bold animate-pulse">
+                  REC 00:{recordingTime.toString().padStart(2, '0')}
+                </div>
+                <button onClick={stopVideoRecording} className="absolute bottom-4 left-1/2 -translate-x-1/2 bg-red-600 text-white p-4 rounded-full shadow-lg">
+                  <StopCircle size={32} />
+                </button>
+              </div>
+            ) : videoBlob ? (
+              <div className="relative aspect-video bg-black rounded-2xl overflow-hidden">
+                <video src={URL.createObjectURL(videoBlob)} controls className="w-full h-full object-cover" />
+                <button onClick={() => setVideoBlob(null)} className="absolute top-2 right-2 bg-black/50 text-white p-1.5 rounded-full hover:bg-black/70">
+                  <X size={20} />
+                </button>
+              </div>
+            ) : (
+              <div className="grid grid-cols-2 gap-3 mt-4">
+                <button onClick={startVideoRecording} className="flex flex-col items-center justify-center gap-2 bg-red-50 border-2 border-red-200 border-dashed p-4 rounded-2xl hover:bg-red-100 transition-colors">
+                  <Video size={28} className="text-red-600" />
+                  <p className="text-slate-700 font-bold text-sm text-center">Record Video<br/><span className="text-xs font-normal text-slate-500">(Max 20s)</span></p>
+                </button>
+              </div>
+            )}
+
 
             <button onClick={() => setStep(2)} disabled={!canProceedStep1} className="w-full bg-blue-700 text-white py-4 rounded-2xl font-bold text-base disabled:opacity-40 disabled:cursor-not-allowed hover:bg-blue-800 active:bg-blue-900 transition-colors shadow-md mt-4">
               Next: Personal Details
