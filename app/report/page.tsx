@@ -2,7 +2,7 @@
 import { useState, useRef, useEffect } from "react";
 import { supabase, supabaseAdmin } from "@/lib/supabase";
 import { burnGeotag } from "@/lib/geotag";
-import { Camera, MapPin, CheckCircle, ArrowLeft, Loader, AlertCircle, FileText, User, X } from "lucide-react";
+import { Camera, MapPin, CheckCircle, ArrowLeft, Loader, AlertCircle, FileText, User, X, Video, StopCircle } from "lucide-react";
 import Link from "next/link";
 
 const damageTypes = ["Cyclone", "Flash / Flood", "Hailstorm", "Frost / Cold Wave", "Drought", "Pest Attack", "Landslide", "Other"];
@@ -24,6 +24,63 @@ export default function ReportPage() {
   const videoChunksRef = useRef<BlobPart[]>([]);
   const videoStreamRef = useRef<MediaStream | null>(null);
   const videoPreviewRef = useRef<HTMLVideoElement>(null);
+
+
+  const startVideoRecording = async () => {
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({
+        video: { facingMode: "environment", width: { ideal: 640 }, height: { ideal: 480 } },
+        audio: true
+      });
+      videoStreamRef.current = stream;
+      if (videoPreviewRef.current) videoPreviewRef.current.srcObject = stream;
+      
+      const recorder = new MediaRecorder(stream, { mimeType: 'video/webm' });
+      mediaRecorderRef.current = recorder;
+      videoChunksRef.current = [];
+
+      recorder.ondataavailable = (e) => {
+        if (e.data.size > 0) videoChunksRef.current.push(e.data);
+      };
+
+      recorder.onstop = () => {
+        const blob = new Blob(videoChunksRef.current, { type: "video/webm" });
+        setVideoBlob(blob);
+        if (videoStreamRef.current) {
+          videoStreamRef.current.getTracks().forEach(t => t.stop());
+        }
+      };
+
+      recorder.start(1000);
+      setIsRecording(true);
+      setRecordingTime(20);
+
+      let timeLeft = 20;
+      const timer = setInterval(() => {
+        timeLeft -= 1;
+        setRecordingTime(timeLeft);
+        if (timeLeft <= 0) {
+          clearInterval(timer);
+          if (mediaRecorderRef.current?.state === "recording") {
+            mediaRecorderRef.current.stop();
+            setIsRecording(false);
+          }
+        }
+      }, 1000);
+      
+      mediaRecorderRef.current.onpause = () => clearInterval(timer);
+    } catch (err) {
+      console.error(err);
+      setError("Could not access camera for video.");
+    }
+  };
+
+  const stopVideoRecording = () => {
+    if (mediaRecorderRef.current?.state === "recording") {
+      mediaRecorderRef.current.stop();
+      setIsRecording(false);
+    }
+  };
 
   const [claimId, setClaimId] = useState("");
   const [error, setError] = useState("");
