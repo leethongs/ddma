@@ -24,16 +24,22 @@ export default function ReportPage() {
   const videoChunksRef = useRef<BlobPart[]>([]);
   const videoStreamRef = useRef<MediaStream | null>(null);
   const videoPreviewRef = useRef<HTMLVideoElement>(null);
+  const videoTimerRef = useRef<NodeJS.Timeout | null>(null);
+  const [showVideoCam, setShowVideoCam] = useState(false);
 
 
   const startVideoRecording = async () => {
     try {
+      setShowVideoCam(true);
       const stream = await navigator.mediaDevices.getUserMedia({
-        video: { facingMode: "environment", width: { ideal: 640 }, height: { ideal: 480 } },
+        video: { facingMode: { ideal: "environment" } },
         audio: true
       });
       videoStreamRef.current = stream;
-      if (videoPreviewRef.current) videoPreviewRef.current.srcObject = stream;
+      if (videoPreviewRef.current) {
+        videoPreviewRef.current.srcObject = stream;
+        videoPreviewRef.current.play().catch(e => console.error("Play error:", e));
+      }
       
       const recorder = new MediaRecorder(stream, { mimeType: 'video/webm' });
       mediaRecorderRef.current = recorder;
@@ -49,39 +55,48 @@ export default function ReportPage() {
         if (videoStreamRef.current) {
           videoStreamRef.current.getTracks().forEach(t => t.stop());
         }
+        setShowVideoCam(false);
+        setIsRecording(false);
       };
 
       recorder.start(1000);
       setIsRecording(true);
       setRecordingTime(20);
 
+      if (videoTimerRef.current) clearInterval(videoTimerRef.current);
+      
       let timeLeft = 20;
-      const timer = setInterval(() => {
+      videoTimerRef.current = setInterval(() => {
         timeLeft -= 1;
         setRecordingTime(timeLeft);
         if (timeLeft <= 0) {
-          clearInterval(timer);
+          if (videoTimerRef.current) clearInterval(videoTimerRef.current);
           if (mediaRecorderRef.current?.state === "recording") {
             mediaRecorderRef.current.stop();
-            setIsRecording(false);
           }
         }
       }, 1000);
       
-      mediaRecorderRef.current.onpause = () => clearInterval(timer);
     } catch (err) {
       console.error(err);
       setError("Could not access camera for video.");
+      setShowVideoCam(false);
     }
   };
 
   const stopVideoRecording = () => {
+    if (videoTimerRef.current) clearInterval(videoTimerRef.current);
     if (mediaRecorderRef.current?.state === "recording") {
       mediaRecorderRef.current.stop();
+    } else {
+      // Just close it if not recording
+      if (videoStreamRef.current) {
+        videoStreamRef.current.getTracks().forEach(t => t.stop());
+      }
+      setShowVideoCam(false);
       setIsRecording(false);
     }
   };
-
   const [claimId, setClaimId] = useState("");
   const [error, setError] = useState("");
   
@@ -227,7 +242,30 @@ export default function ReportPage() {
   return (
     <div className="min-h-screen bg-slate-50 flex flex-col relative">
       
-      {/* Fullscreen WebRTC Camera UI */}
+      
+        {/* Fullscreen Video Camera UI */}
+        {showVideoCam && (
+          <div className="fixed inset-0 z-[60] bg-black flex flex-col">
+            <div className="flex justify-between items-center p-4 text-white z-10 absolute top-0 w-full bg-gradient-to-b from-black/60 to-transparent">
+              <button onClick={stopVideoRecording} className="p-2 bg-black/50 rounded-full"><X size={24} /></button>
+              {isRecording && (
+                <div className="flex items-center gap-2 bg-red-600 px-3 py-1 rounded-full animate-pulse">
+                  <div className="w-2 h-2 bg-white rounded-full"></div>
+                  <p className="font-bold text-sm">00:{recordingTime.toString().padStart(2, '0')}</p>
+                </div>
+              )}
+              <div className="w-10"></div>
+            </div>
+            <video ref={videoPreviewRef} playsInline autoPlay muted className="flex-1 w-full h-full object-cover" />
+            <div className="absolute bottom-0 w-full p-8 flex justify-center bg-gradient-to-t from-black/80 to-transparent">
+              <button onClick={stopVideoRecording} className="w-20 h-20 bg-red-600 rounded-full border-4 border-red-300 shadow-xl flex items-center justify-center active:scale-95 transition-transform">
+                <StopCircle size={40} className="text-white" />
+              </button>
+            </div>
+          </div>
+        )}
+
+        {/* Fullscreen WebRTC Camera UI */}
       {showWebcam && (
         <div className="fixed inset-0 z-50 bg-black flex flex-col">
           <div className="flex justify-between items-center p-4 text-white z-10 absolute top-0 w-full bg-gradient-to-b from-black/60 to-transparent">
@@ -325,31 +363,21 @@ export default function ReportPage() {
             )}
             {photos.length >= 5 && <p className="text-center text-xs text-slate-400">Maximum 5 photos allowed.</p>}
 
-            {/* Video Recording UI */}
-            {isRecording ? (
-              <div className="bg-black rounded-2xl overflow-hidden relative aspect-video">
-                <video ref={videoPreviewRef} autoPlay playsInline muted className="w-full h-full object-cover" />
-                <div className="absolute top-4 right-4 bg-red-600 text-white px-3 py-1 rounded-full text-sm font-bold animate-pulse">
-                  REC 00:{recordingTime.toString().padStart(2, '0')}
+            {/* Video Preview UI */}
+              {videoBlob ? (
+                <div className="relative aspect-video bg-black rounded-2xl overflow-hidden mt-4">
+                  <video src={URL.createObjectURL(videoBlob)} controls className="w-full h-full object-cover" />
+                  <button onClick={() => setVideoBlob(null)} className="absolute top-2 right-2 bg-black/50 text-white p-1.5 rounded-full hover:bg-black/70">
+                    <X size={20} />
+                  </button>
                 </div>
-                <button onClick={stopVideoRecording} className="absolute bottom-4 left-1/2 -translate-x-1/2 bg-red-600 text-white p-4 rounded-full shadow-lg">
-                  <StopCircle size={32} />
-                </button>
-              </div>
-            ) : videoBlob ? (
-              <div className="relative aspect-video bg-black rounded-2xl overflow-hidden">
-                <video src={URL.createObjectURL(videoBlob)} controls className="w-full h-full object-cover" />
-                <button onClick={() => setVideoBlob(null)} className="absolute top-2 right-2 bg-black/50 text-white p-1.5 rounded-full hover:bg-black/70">
-                  <X size={20} />
-                </button>
-              </div>
-            ) : (
-              <div className="grid grid-cols-2 gap-3 mt-4">
-                <button onClick={startVideoRecording} className="flex flex-col items-center justify-center gap-2 bg-red-50 border-2 border-red-200 border-dashed p-4 rounded-2xl hover:bg-red-100 transition-colors">
-                  <Video size={28} className="text-red-600" />
-                  <p className="text-slate-700 font-bold text-sm text-center">Record Video<br/><span className="text-xs font-normal text-slate-500">(Max 20s)</span></p>
-                </button>
-              </div>
+              ) : (
+                <div className="grid grid-cols-1 gap-3 mt-4">
+                  <button onClick={startVideoRecording} className="flex flex-col items-center justify-center gap-2 bg-red-50 border-2 border-red-200 border-dashed p-4 rounded-2xl hover:bg-red-100 transition-colors">
+                    <Video size={28} className="text-red-600" />
+                    <p className="text-slate-700 font-bold text-sm text-center">Record Video (Optional)<br/><span className="text-xs font-normal text-slate-500">Max 20 seconds</span></p>
+                  </button>
+</div>
             )}
 
 
