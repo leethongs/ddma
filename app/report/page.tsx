@@ -204,11 +204,15 @@ export default function ReportPage() {
         setGpsLoading(false);
       },
       (err) => {
-        setGpsError("Warning: GPS Location blocked or turned off in phone menu. You can still proceed without coordinates.");
-        setGpsLoading(false);
-        setPhotos(p => [...p, { file, blob: null, preview: URL.createObjectURL(file) }]);
-      },
-      { enableHighAccuracy: true, timeout: 15000 }
+          let msg = "GPS Warning: Could not get location.";
+          if (err.code === 1) msg = "Location Permission Denied! Please allow browser access.";
+          else if (err.code === 2) msg = "Location Unavailable. Ensure GPS is on.";
+          else if (err.code === 3) msg = "Location request timed out.";
+          setGpsError(msg + " You can still proceed without coordinates.");
+          setGpsLoading(false);
+          setPhotos(p => [...p, { file, blob: null, preview: URL.createObjectURL(file) }]);
+        },
+        { enableHighAccuracy: false, timeout: 15000, maximumAge: 60000 }
     );
   }
 
