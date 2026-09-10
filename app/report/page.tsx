@@ -118,6 +118,30 @@ export default function ReportPage() {
     }
   };
 
+    const [claimId, setClaimId] = useState("");
+  const [error, setError] = useState("");
+  
+  // WebRTC Camera State
+  const [showWebcam, setShowWebcam] = useState(false);
+  const videoRef = useRef<HTMLVideoElement>(null);
+  const galleryRef = useRef<HTMLInputElement>(null);
+
+  const [form, setForm] = useState({
+    victim_name: "", contact_number: "", aadhaar_number: "", address: "",
+    damage_type: "Cyclone", damage_details: "",
+  });
+  const [selectedAssets, setSelectedAssets] = useState<string[]>([]);
+
+  const assetCategories = {
+    "Infrastructure": ["Communication", "Retaining Walls", "Bridges", "Drainage", "Electricity", "Road", "Water Source", "Footpath", "Irrigation Canal"],
+    "Housing": ["Pucca House", "Kutcha House", "Huts", "Cattle Sheds"],
+    "Agri Allied Sector": ["Plantation", "Fisheries", "Animal and Husbandry", "Agri crops", "Horti crops"]
+  };
+
+  function toggleAsset(asset: string) {
+    setSelectedAssets(prev => prev.includes(asset) ? prev.filter(a => a !== asset) : [...prev, asset]);
+  }
+
   async function startCamera() {
     setShowWebcam(true);
     try {
