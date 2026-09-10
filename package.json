@@ -9,6 +9,9 @@
         "lint": "eslint"
     },
     "dependencies": {
+        "@capacitor/android": "^8.5.1",
+        "@capacitor/cli": "^8.5.1",
+        "@capacitor/core": "^8.5.1",
         "fix-webm-duration": "^1.0.6",
         "idb-keyval": "^6.3.0",
         "jimp": "^1.6.1",
