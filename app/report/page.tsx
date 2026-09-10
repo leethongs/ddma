@@ -217,6 +217,27 @@ export default function ReportPage() {
         finalDetails = `Affected Categories: ${selectedAssets.join(", ")}\n\n${form.damage_details}`;
       }
 
+      let uploadedVideoUrl = null;
+      if (videoBlob) {
+        const formData = new FormData();
+        formData.append("file", videoBlob, "video.webm");
+        formData.append("upload_preset", "ddma_videos");
+        try {
+          const res = await fetch("https://api.cloudinary.com/v1_1/w2lqryns/video/upload", {
+            method: "POST",
+            body: formData
+          });
+          const dataRes = await res.json();
+          if (dataRes.secure_url) {
+            uploadedVideoUrl = dataRes.secure_url;
+          } else {
+            console.error("Cloudinary error:", dataRes);
+          }
+        } catch (e) {
+          console.error("Video upload failed", e);
+        }
+      }
+
       const { data, error: dbErr } = await supabaseAdmin.from("incidents").insert([{
         victim_name: form.victim_name,
         contact_number: form.contact_number,
@@ -225,6 +246,7 @@ export default function ReportPage() {
         damage_type: form.damage_type,
         damage_details: finalDetails.trim(),
         photo_url: uploadedUrls.join(",") || null,
+        video_url: uploadedVideoUrl,
         latitude: coords?.lat ?? null,
         longitude: coords?.lng ?? null,
         status: "pending",
