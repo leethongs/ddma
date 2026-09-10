@@ -4,6 +4,7 @@ import { supabase, supabaseAdmin } from "@/lib/supabase";
 import { burnGeotag } from "@/lib/geotag";
 import { Camera, MapPin, CheckCircle, ArrowLeft, Loader, AlertCircle, FileText, User, X, Video, StopCircle } from "lucide-react";
 import Link from "next/link";
+import { saveReportOffline } from "@/lib/idb";
 // @ts-ignore
 import fixWebmDuration from "fix-webm-duration";
 
@@ -218,6 +219,28 @@ export default function ReportPage() {
   async function handleSubmit() {
     setSubmitting(true);
     setError("");
+    if (!navigator.onLine) {
+      try {
+        const offlineData = {
+          id: "offline-" + Date.now(),
+          form,
+          selectedAssets,
+          coords,
+          photos: photos.map(p => p.blob || p.file),
+          videoBlob,
+          videoExtension: videoBlob ? (videoBlob.type.includes("mp4") ? "mp4" : "webm") : null
+        };
+        await saveReportOffline(offlineData);
+        setClaimId("OFFLINE-SAVED");
+        setStep("done");
+      } catch (err) {
+        console.error("Offline save error", err);
+        setError("Failed to save offline. Your device might be out of storage.");
+      }
+      setSubmitting(false);
+      return;
+    }
+
     try {
       const uploadedUrls: string[] = [];
       

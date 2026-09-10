@@ -2,7 +2,10 @@
 import { useEffect, useState } from "react";
 import { supabase } from "@/lib/supabase";
 import Link from "next/link";
-import { AlertTriangle, FileText, Search, Phone, Shield, ChevronRight, X, BellRing } from "lucide-react";
+import { AlertTriangle, FileText, Search, Phone, Shield, ChevronRight, X, BellRing, Cloud, Loader } from "lucide-react";
+import { getOfflineReports, clearOfflineReport } from "@/lib/idb";
+import { supabaseAdmin } from "@/lib/supabase";
+
 
 interface Alert { id: string; title: string; message: string; severity: string; affected_area?: string; }
 interface Setting { key: string; value: string; }
@@ -12,6 +15,90 @@ export default function Home() {
   const [settings, setSettings] = useState<Record<string, string>>({});
   const [showAlerts, setShowAlerts] = useState(true);
   const [subscribed, setSubscribed] = useState(false);
+  const [offlineReports, setOfflineReports] = useState<any[]>([]);
+  const [syncing, setSyncing] = useState(false);
+
+  useEffect(() => {
+    getOfflineReports().then(setOfflineReports);
+  }, []);
+
+  async function handleSync() {
+    if (!navigator.onLine) return alert("You are currently offline. Please connect to the internet first.");
+    setSyncing(true);
+    let successCount = 0;
+    
+    try {
+      for (const report of offlineReports) {
+        const { form, selectedAssets, coords, photos, videoBlob, videoExtension } = report;
+        
+        // 1. Photos
+        const uploadedUrls: string[] = [];
+        for (const pBlob of photos) {
+          const fname = "incident-" + Date.now() + "-" + Math.random().toString(36).substring(7) + ".jpg";
+          const { error: uploadErr } = await supabaseAdmin.storage.from("incident-photos").upload(fname, pBlob, { contentType: "image/jpeg" });
+          if (uploadErr) throw uploadErr;
+          const { data: urlData } = supabaseAdmin.storage.from("incident-photos").getPublicUrl(fname);
+          uploadedUrls.push(urlData.publicUrl);
+        }
+
+        // 2. Details
+        let finalDetails = form.damage_details;
+        if (selectedAssets.length > 0) {
+          finalDetails = `Affected Categories: ${selectedAssets.join(", ")}\n\n${form.damage_details}`;
+        }
+
+        // 3. Video
+        let uploadedVideoUrl = null;
+        if (videoBlob) {
+          const formData = new FormData();
+          formData.append("file", videoBlob, "video." + (videoExtension || "webm"));
+          formData.append("upload_preset", "ddma_videos");
+          try {
+            const res = await fetch("https://api.cloudinary.com/v1_1/w2lqryns/video/upload", {
+              method: "POST",
+              body: formData
+            });
+            const dataRes = await res.json();
+            if (dataRes.secure_url) uploadedVideoUrl = dataRes.secure_url;
+          } catch (e) {
+            console.error("Video upload failed", e);
+          }
+        }
+
+        // 4. DB Insert
+        const { error: dbErr } = await supabaseAdmin.from("incidents").insert([{
+          victim_name: form.victim_name,
+          contact_number: form.contact_number,
+          aadhaar_number: form.aadhaar_number || null,
+          address: form.address,
+          damage_type: form.damage_type,
+          damage_details: finalDetails.trim(),
+          photo_url: uploadedUrls.join(",") || null,
+          video_url: uploadedVideoUrl,
+          latitude: coords?.lat ?? null,
+          longitude: coords?.lng ?? null,
+          status: "pending",
+        }]);
+        
+        if (dbErr) throw dbErr;
+        
+        await clearOfflineReport(report.id);
+        successCount++;
+      }
+      
+      const remaining = await getOfflineReports();
+      setOfflineReports(remaining);
+      
+      if (successCount > 0) {
+        alert(`Successfully synced ${successCount} offline reports!`);
+      }
+    } catch (e: any) {
+      console.error(e);
+      alert("Failed to sync some reports. Please try again. Error: " + e.message);
+    }
+    setSyncing(false);
+  }
+
 
   useEffect(() => {
     fetch("/api/setup").then(() => {
@@ -105,6 +192,22 @@ export default function Home() {
             ))}
           </div>
         </div>
+
+        
+        {offlineReports.length > 0 && (
+          <div className="bg-orange-50 border-2 border-orange-200 rounded-2xl p-5 mb-8">
+            <div className="flex items-center gap-3 mb-3">
+              <div className="bg-orange-100 p-2 rounded-full"><Cloud className="text-orange-600" size={24} /></div>
+              <div>
+                <p className="font-bold text-orange-900">Offline Reports Pending</p>
+                <p className="text-orange-700 text-sm">You have {offlineReports.length} report(s) saved offline.</p>
+              </div>
+            </div>
+            <button onClick={handleSync} disabled={syncing} className="w-full bg-orange-500 hover:bg-orange-600 active:bg-orange-700 text-white font-bold py-3 rounded-xl flex items-center justify-center gap-2 transition-colors disabled:opacity-50">
+              {syncing ? <><Loader size={18} className="animate-spin" /> Syncing to Server...</> : "Upload Now"}
+            </button>
+          </div>
+        )}
 
         <p className="text-slate-500 text-xs font-semibold uppercase tracking-widest mb-3">What do you need?</p>
         <div className="space-y-4 mb-8">
