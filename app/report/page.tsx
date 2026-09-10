@@ -238,7 +238,8 @@ export default function ReportPage() {
       let uploadedVideoUrl = null;
       if (videoBlob) {
         const formData = new FormData();
-        formData.append("file", videoBlob, "video.webm");
+                const extension = videoBlob.type.includes("mp4") ? "mp4" : "webm";
+        formData.append("file", videoBlob, incident-video.);
         formData.append("upload_preset", "ddma_videos");
         try {
           const res = await fetch("https://api.cloudinary.com/v1_1/w2lqryns/video/upload", {
