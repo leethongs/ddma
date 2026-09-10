@@ -4,6 +4,8 @@ import { supabase, supabaseAdmin } from "@/lib/supabase";
 import { burnGeotag } from "@/lib/geotag";
 import { Camera, MapPin, CheckCircle, ArrowLeft, Loader, AlertCircle, FileText, User, X, Video, StopCircle } from "lucide-react";
 import Link from "next/link";
+// @ts-ignore
+import fixWebmDuration from "fix-webm-duration";
 
 const damageTypes = ["Cyclone", "Flash / Flood", "Hailstorm", "Frost / Cold Wave", "Drought", "Pest Attack", "Landslide", "Other"];
 
@@ -25,6 +27,7 @@ export default function ReportPage() {
   const videoStreamRef = useRef<MediaStream | null>(null);
   const videoPreviewRef = useRef<HTMLVideoElement>(null);
   const videoTimerRef = useRef<NodeJS.Timeout | null>(null);
+  const startTimeRef = useRef<number>(0);
   const [showVideoCam, setShowVideoCam] = useState(false);
 
 
@@ -248,23 +251,30 @@ export default function ReportPage() {
           <div className="fixed inset-0 z-[60] bg-black flex flex-col">
             <div className="flex justify-between items-center p-4 text-white z-10 absolute top-0 w-full bg-gradient-to-b from-black/60 to-transparent">
               <button onClick={stopVideoRecording} className="p-2 bg-black/50 rounded-full"><X size={24} /></button>
-              {isRecording && (
+              {isRecording ? (
                 <div className="flex items-center gap-2 bg-red-600 px-3 py-1 rounded-full animate-pulse">
                   <div className="w-2 h-2 bg-white rounded-full"></div>
                   <p className="font-bold text-sm">00:{recordingTime.toString().padStart(2, '0')}</p>
                 </div>
+              ) : (
+                <p className="font-bold">Video Camera</p>
               )}
               <div className="w-10"></div>
             </div>
             <video ref={videoPreviewRef} playsInline autoPlay muted className="flex-1 w-full h-full object-cover" />
             <div className="absolute bottom-0 w-full p-8 flex justify-center bg-gradient-to-t from-black/80 to-transparent">
-              <button onClick={stopVideoRecording} className="w-20 h-20 bg-red-600 rounded-full border-4 border-red-300 shadow-xl flex items-center justify-center active:scale-95 transition-transform">
-                <StopCircle size={40} className="text-white" />
-              </button>
+              {isRecording ? (
+                <button onClick={stopVideoRecording} className="w-20 h-20 bg-red-600 rounded-full border-4 border-red-300 shadow-xl flex items-center justify-center active:scale-95 transition-transform">
+                  <StopCircle size={40} className="text-white" />
+                </button>
+              ) : (
+                <button onClick={startRecording} className="w-20 h-20 bg-white rounded-full border-4 border-slate-300 shadow-xl flex items-center justify-center active:scale-95 transition-transform">
+                  <div className="w-14 h-14 bg-red-600 rounded-full"></div>
+                </button>
+              )}
             </div>
           </div>
         )}
-
         {/* Fullscreen WebRTC Camera UI */}
       {showWebcam && (
         <div className="fixed inset-0 z-50 bg-black flex flex-col">
@@ -373,7 +383,7 @@ export default function ReportPage() {
                 </div>
               ) : (
                 <div className="grid grid-cols-1 gap-3 mt-4">
-                  <button onClick={startVideoRecording} className="flex flex-col items-center justify-center gap-2 bg-red-50 border-2 border-red-200 border-dashed p-4 rounded-2xl hover:bg-red-100 transition-colors">
+                  <button onClick={openVideoCam} className="flex flex-col items-center justify-center gap-2 bg-red-50 border-2 border-red-200 border-dashed p-4 rounded-2xl hover:bg-red-100 transition-colors">
                     <Video size={28} className="text-red-600" />
                     <p className="text-slate-700 font-bold text-sm text-center">Record Video (Optional)<br/><span className="text-xs font-normal text-slate-500">Max 20 seconds</span></p>
                   </button>
