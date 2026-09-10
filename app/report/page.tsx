@@ -31,9 +31,11 @@ export default function ReportPage() {
   const [showVideoCam, setShowVideoCam] = useState(false);
 
 
-  const startVideoRecording = async () => {
+  const openVideoCam = async () => {
     try {
       setShowVideoCam(true);
+      setIsRecording(false);
+      setRecordingTime(20);
       const stream = await navigator.mediaDevices.getUserMedia({
         video: { facingMode: { ideal: "environment" } },
         audio: true
@@ -43,43 +45,6 @@ export default function ReportPage() {
         videoPreviewRef.current.srcObject = stream;
         videoPreviewRef.current.play().catch(e => console.error("Play error:", e));
       }
-      
-      const recorder = new MediaRecorder(stream, { mimeType: 'video/webm' });
-      mediaRecorderRef.current = recorder;
-      videoChunksRef.current = [];
-
-      recorder.ondataavailable = (e) => {
-        if (e.data.size > 0) videoChunksRef.current.push(e.data);
-      };
-
-      recorder.onstop = () => {
-        const blob = new Blob(videoChunksRef.current, { type: "video/webm" });
-        setVideoBlob(blob);
-        if (videoStreamRef.current) {
-          videoStreamRef.current.getTracks().forEach(t => t.stop());
-        }
-        setShowVideoCam(false);
-        setIsRecording(false);
-      };
-
-      recorder.start(1000);
-      setIsRecording(true);
-      setRecordingTime(20);
-
-      if (videoTimerRef.current) clearInterval(videoTimerRef.current);
-      
-      let timeLeft = 20;
-      videoTimerRef.current = setInterval(() => {
-        timeLeft -= 1;
-        setRecordingTime(timeLeft);
-        if (timeLeft <= 0) {
-          if (videoTimerRef.current) clearInterval(videoTimerRef.current);
-          if (mediaRecorderRef.current?.state === "recording") {
-            mediaRecorderRef.current.stop();
-          }
-        }
-      }, 1000);
-      
     } catch (err) {
       console.error(err);
       setError("Could not access camera for video.");
@@ -87,12 +52,64 @@ export default function ReportPage() {
     }
   };
 
+  const startRecording = () => {
+    if (!videoStreamRef.current) return;
+    const stream = videoStreamRef.current;
+    
+    const recorder = new MediaRecorder(stream);
+    mediaRecorderRef.current = recorder;
+    videoChunksRef.current = [];
+
+    recorder.ondataavailable = (e) => {
+      if (e.data.size > 0) videoChunksRef.current.push(e.data);
+    };
+
+    recorder.onstop = () => {
+      const mimeType = recorder.mimeType || "video/webm";
+      const duration = Date.now() - startTimeRef.current;
+      const blob = new Blob(videoChunksRef.current, { type: mimeType });
+      
+      const cleanup = (finalBlob: Blob) => {
+        setVideoBlob(finalBlob);
+        if (videoStreamRef.current) {
+          videoStreamRef.current.getTracks().forEach(t => t.stop());
+        }
+        setShowVideoCam(false);
+        setIsRecording(false);
+      };
+
+      if (mimeType.includes("webm")) {
+        fixWebmDuration(blob, duration, cleanup);
+      } else {
+        cleanup(blob);
+      }
+    };
+
+    startTimeRef.current = Date.now();
+    recorder.start(1000);
+    setIsRecording(true);
+    setRecordingTime(20);
+
+    if (videoTimerRef.current) clearInterval(videoTimerRef.current);
+    
+    let timeLeft = 20;
+    videoTimerRef.current = setInterval(() => {
+      timeLeft -= 1;
+      setRecordingTime(timeLeft);
+      if (timeLeft <= 0) {
+        if (videoTimerRef.current) clearInterval(videoTimerRef.current);
+        if (mediaRecorderRef.current?.state === "recording") {
+          mediaRecorderRef.current.stop();
+        }
+      }
+    }, 1000);
+  };
+
   const stopVideoRecording = () => {
     if (videoTimerRef.current) clearInterval(videoTimerRef.current);
     if (mediaRecorderRef.current?.state === "recording") {
       mediaRecorderRef.current.stop();
     } else {
-      // Just close it if not recording
       if (videoStreamRef.current) {
         videoStreamRef.current.getTracks().forEach(t => t.stop());
       }
@@ -100,29 +117,6 @@ export default function ReportPage() {
       setIsRecording(false);
     }
   };
-  const [claimId, setClaimId] = useState("");
-  const [error, setError] = useState("");
-  
-  // WebRTC Camera State
-  const [showWebcam, setShowWebcam] = useState(false);
-  const videoRef = useRef<HTMLVideoElement>(null);
-  const galleryRef = useRef<HTMLInputElement>(null);
-
-  const [form, setForm] = useState({
-    victim_name: "", contact_number: "", aadhaar_number: "", address: "",
-    damage_type: "Cyclone", damage_details: "",
-  });
-  const [selectedAssets, setSelectedAssets] = useState<string[]>([]);
-
-  const assetCategories = {
-    "Infrastructure": ["Communication", "Retaining Walls", "Bridges", "Drainage", "Electricity", "Road", "Water Source", "Footpath", "Irrigation Canal"],
-    "Housing": ["Pucca House", "Kutcha House", "Huts", "Cattle Sheds"],
-    "Agri Allied Sector": ["Plantation", "Fisheries", "Animal and Husbandry", "Agri crops", "Horti crops"]
-  };
-
-  function toggleAsset(asset: string) {
-    setSelectedAssets(prev => prev.includes(asset) ? prev.filter(a => a !== asset) : [...prev, asset]);
-  }
 
   async function startCamera() {
     setShowWebcam(true);
